@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Jefferson County Precinct Leader Finder</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <h1>Jefferson County Precinct Leader Finder</h1>
+      <div class="header-stats" id="header-stats"></div>
+    </div>
+  </header>
+
+  <main>
+    <!-- Left panel: search + results -->
+    <div class="panel" id="panel">
+      <section class="search-section">
+        <label for="address-input">Enter your street address</label>
+        <div class="input-row">
+          <input
+            type="text"
+            id="address-input"
+            placeholder="123 Main St, Louisville, KY"
+            autocomplete="street-address"
+          />
+          <button id="search-btn">Find My Precinct</button>
+        </div>
+        <p class="hint">You can include or omit the city — we'll assume Louisville, KY.</p>
+      </section>
+
+      <!-- Loading state -->
+      <div id="loading" class="loading hidden">
+        <div class="spinner"></div>
+        <span>Looking up your address&hellip;</span>
+      </div>
+
+      <!-- Error state -->
+      <div id="error-box" class="error-box hidden">
+        <svg class="icon" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+        </svg>
+        <p id="error-msg"></p>
+      </div>
+
+      <!-- Results -->
+      <div id="result-box" class="result-box hidden">
+        <div class="matched-address">
+          <span class="muted">Matched:</span>
+          <span id="matched-addr"></span>
+        </div>
+
+        <div class="precinct-card" id="precinct-card">
+          <div class="precinct-card-left">
+            <div class="precinct-label">Precinct</div>
+            <div class="precinct-code" id="r-precinct"></div>
+            <div class="ld-label">Legislative District <span id="r-ld"></span></div>
+          </div>
+          <div class="precinct-card-right" id="r-status-badge">
+            <div class="badge-count" id="r-count"></div>
+            <div class="badge-of">of 3 leaders</div>
+            <div class="badge-label" id="r-badge-label"></div>
+          </div>
+        </div>
+
+        <!-- CTA: precinct needs leaders -->
+        <div id="cta-box" class="cta-box hidden">
+          <h3>This precinct needs leaders!</h3>
+          <p>
+            Precinct <strong id="cta-precinct"></strong> currently has
+            <strong id="cta-count"></strong> registered leader(s) — we need at least 3
+            to be fully organized.
+          </p>
+          <p>If you're interested in stepping up, click below to send us a note:</p>
+          <a id="cta-email-link" class="cta-btn" href="#">
+            Express Interest in Becoming a Precinct Leader
+          </a>
+        </div>
+
+        <!-- Fully staffed message -->
+        <div id="full-box" class="full-box hidden">
+          <h3>&#10003; This precinct is fully staffed</h3>
+          <p>
+            Precinct <strong id="full-precinct"></strong> has
+            <strong id="full-count"></strong> registered leader(s). Thank you to
+            everyone who's involved!
+          </p>
+        </div>
+      </div>
+
+      <!-- Legend (visible below results on mobile) -->
+      <div class="legend-mobile" id="legend-mobile">
+        <h4>Map Legend</h4>
+        <div class="legend-row"><span class="swatch" style="background:#28a745"></span>3 or more leaders</div>
+        <div class="legend-row"><span class="swatch" style="background:#ffc107"></span>1–2 leaders</div>
+        <div class="legend-row"><span class="swatch" style="background:#dc3545"></span>No leaders</div>
+      </div>
+    </div>
+
+    <!-- Right panel: map -->
+    <div id="map"></div>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

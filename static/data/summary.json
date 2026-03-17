@@ -1,0 +1,6 @@
+{
+  "total_precincts": 627,
+  "precincts_with_enough": 16,
+  "precincts_needing_leaders": 611,
+  "leader_threshold": 3
+}
