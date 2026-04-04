@@ -26,3 +26,6 @@ errorlog  = "-"   # stderr
 
 # Process name
 proc_name = "precinct-finder"
+
+# Worker temp files — must be writable by the service user (www-data)
+worker_tmp_dir = "/tmp"
