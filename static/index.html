@@ -74,10 +74,10 @@
             <strong id="cta-count"></strong> registered leader(s) — we need at least 3
             to be fully organized.
           </p>
-          <p>If you're interested in stepping up, click below to send us a note:</p>
-          <a id="cta-email-link" class="cta-btn" href="#">
+          <p>If you're interested in stepping up, let us know:</p>
+          <button id="cta-open-form" class="cta-btn">
             Express Interest in Becoming a Precinct Leader
-          </a>
+          </button>
         </div>
 
         <!-- Fully staffed message -->
@@ -103,6 +103,62 @@
     <!-- Right panel: map -->
     <div id="map"></div>
   </main>
+
+  <!-- ── Leader Interest Form Modal ── -->
+  <div id="interest-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2 id="modal-title">Express Interest in Becoming a Precinct Leader</h2>
+        <button class="modal-close" id="modal-close-btn" aria-label="Close">&times;</button>
+      </div>
+      <p class="modal-desc">
+        Fill out the form below and our team will follow up with next steps.
+        Precinct <strong id="modal-precinct-label"></strong> (LD <span id="modal-ld-label"></span>)
+      </p>
+
+      <div id="modal-success" class="modal-success hidden">
+        <strong>Thank you!</strong> We've received your information and will be in touch soon.
+      </div>
+      <div id="modal-error" class="modal-form-error hidden"></div>
+
+      <form id="interest-form" novalidate>
+        <input type="hidden" id="form-precinct"  name="precinct_code" />
+        <input type="hidden" id="form-leg-dist"  name="leg_dist" />
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="form-first-name">First Name <span class="required">*</span></label>
+            <input type="text" id="form-first-name" name="first_name" required autocomplete="given-name" />
+          </div>
+          <div class="form-group">
+            <label for="form-last-name">Last Name <span class="required">*</span></label>
+            <input type="text" id="form-last-name" name="last_name" required autocomplete="family-name" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="form-email">Email <span class="required">*</span></label>
+          <input type="email" id="form-email" name="email" required autocomplete="email" />
+        </div>
+
+        <div class="form-group">
+          <label for="form-phone">Phone <span class="optional">(optional)</span></label>
+          <input type="tel" id="form-phone" name="phone" autocomplete="tel" />
+        </div>
+
+        <div class="form-group">
+          <label for="form-message">Message <span class="optional">(optional)</span></label>
+          <textarea id="form-message" name="message" rows="3"
+            placeholder="Best time to reach you, questions, etc."></textarea>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="btn-secondary" id="modal-cancel-btn">Cancel</button>
+          <button type="submit" class="btn-primary" id="form-submit-btn">Submit</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>

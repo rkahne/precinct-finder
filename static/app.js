@@ -9,9 +9,9 @@ const COLORS = {
 };
 
 let map, precinctLayer, highlightLayer, userMarker;
-let geojsonData = null;
-let contactEmail = "YOUR_EMAIL_HERE@example.com";
+let geojsonData    = null;
 let leaderThreshold = 3;
+let lastSearchData  = null; // stored for form pre-fill
 
 // ---------------------------------------------------------------------------
 // Initialization
@@ -25,29 +25,48 @@ async function init() {
     maxZoom: 19,
   }).addTo(map);
 
-  // Fetch app config (contact email, threshold)
+  // Fetch app config
   try {
     const cfg = await fetch("/api/config").then((r) => r.json());
-    contactEmail = cfg.contact_email || contactEmail;
     leaderThreshold = cfg.leader_threshold || leaderThreshold;
   } catch (_) {}
 
-  // Load and render precinct GeoJSON
+  // Load precinct GeoJSON, then overlay live leader counts from DB
   try {
     const resp = await fetch("/data/precincts.geojson");
     geojsonData = await resp.json();
+    await _mergeLiveLeaderCounts();
     renderPrecincts();
     addMapLegend();
-    loadSummaryStats();
   } catch (err) {
     console.error("Failed to load precinct data:", err);
   }
 
-  // Wire up search
-  const btn = document.getElementById("search-btn");
+  loadSummaryStats();
+  wireModal();
+
+  const btn   = document.getElementById("search-btn");
   const input = document.getElementById("address-input");
   btn.addEventListener("click", doSearch);
   input.addEventListener("keypress", (e) => { if (e.key === "Enter") doSearch(); });
+}
+
+// ---------------------------------------------------------------------------
+// Merge live leader counts from the database into the loaded GeoJSON
+// Falls back silently to GeoJSON values if the API is unavailable.
+// ---------------------------------------------------------------------------
+
+async function _mergeLiveLeaderCounts() {
+  try {
+    const counts = await fetch("/api/leader-counts").then((r) => r.json());
+    if (!counts || !geojsonData) return;
+    geojsonData.features.forEach((f) => {
+      const code = f.properties.precinct;
+      if (counts[code] !== undefined) {
+        f.properties.unique_leaders = counts[code].unique_leaders;
+      }
+    });
+  } catch (_) {}
 }
 
 // ---------------------------------------------------------------------------
@@ -74,7 +93,7 @@ function renderPrecincts() {
   precinctLayer = L.geoJSON(geojsonData, {
     style: baseStyle,
     onEachFeature(feature, layer) {
-      const p = feature.properties;
+      const p      = feature.properties;
       const status =
         p.unique_leaders >= leaderThreshold ? "Fully staffed" :
         p.unique_leaders > 0 ? "Needs more leaders" : "No leaders";
@@ -112,9 +131,9 @@ function addMapLegend() {
 
 async function loadSummaryStats() {
   try {
-    const s = await fetch("/data/summary.json").then((r) => r.json());
+    const s  = await fetch("/api/summary").then((r) => r.json());
     const el = document.getElementById("header-stats");
-    if (el) {
+    if (el && s.total_precincts) {
       el.textContent =
         `${s.precincts_with_enough} of ${s.total_precincts} precincts fully staffed`;
     }
@@ -142,15 +161,14 @@ async function doSearch() {
       return;
     }
 
-    const { lat, lon, matched_address } = data;
+    const { lat, lon, matched_address, address_input } = data;
 
     if (!geojsonData) {
       showError("Precinct data not yet loaded. Please wait a moment and try again.");
       return;
     }
 
-    // Point-in-polygon using Turf.js
-    const pt = turf.point([lon, lat]);
+    const pt    = turf.point([lon, lat]);
     const found = geojsonData.features.find((f) =>
       turf.booleanPointInPolygon(pt, f)
     );
@@ -162,6 +180,20 @@ async function doSearch() {
       );
       return;
     }
+
+    // Log the search (fire-and-forget)
+    fetch("/api/track-search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        address_input:   address_input || address,
+        matched_address: matched_address,
+        precinct_code:   found.properties.precinct,
+        leg_dist:        found.properties.leg_dist,
+        lat,
+        lon,
+      }),
+    }).catch(() => {});
 
     showResults(found, matched_address, lat, lon);
   } catch (err) {
@@ -177,44 +209,35 @@ async function doSearch() {
 // ---------------------------------------------------------------------------
 
 function showResults(feature, matchedAddress, lat, lon) {
-  const p = feature.properties;
+  const p     = feature.properties;
   const count = p.unique_leaders;
   const isFull = count >= leaderThreshold;
 
-  // Matched address
   document.getElementById("matched-addr").textContent = matchedAddress;
+  document.getElementById("r-precinct").textContent   = p.precinct;
+  document.getElementById("r-ld").textContent         = p.leg_dist;
+  document.getElementById("r-count").textContent      = count;
 
-  // Precinct info
-  document.getElementById("r-precinct").textContent = p.precinct;
-  document.getElementById("r-ld").textContent = p.leg_dist;
-  document.getElementById("r-count").textContent = count;
-
-  // Status badge
-  const badge = document.getElementById("r-status-badge");
+  const badge      = document.getElementById("r-status-badge");
   const badgeLabel = document.getElementById("r-badge-label");
-  badge.className = "precinct-card-right " + (isFull ? "status-full" : count > 0 ? "status-needs" : "status-empty");
+  badge.className  = "precinct-card-right " +
+    (isFull ? "status-full" : count > 0 ? "status-needs" : "status-empty");
   badgeLabel.textContent = isFull ? "Fully Staffed" : "Needs Leaders";
 
-  // CTA or full-staffed message
   if (isFull) {
     document.getElementById("full-precinct").textContent = p.precinct;
-    document.getElementById("full-count").textContent = count;
+    document.getElementById("full-count").textContent    = count;
     show("full-box");
     hide("cta-box");
   } else {
     document.getElementById("cta-precinct").textContent = p.precinct;
-    document.getElementById("cta-count").textContent = count;
+    document.getElementById("cta-count").textContent    = count;
 
-    const subject = encodeURIComponent(
-      `Interest in Becoming a Precinct Leader — Precinct ${p.precinct}`
-    );
-    const body = encodeURIComponent(
-      `Hello,\n\nI am interested in becoming a precinct leader for ` +
-      `Precinct ${p.precinct} (Legislative District ${p.leg_dist}).\n\n` +
-      `My name is:\nMy phone/email:\nBest time to reach me:\n\nThank you!`
-    );
-    document.getElementById("cta-email-link").href =
-      `mailto:${contactEmail}?subject=${subject}&body=${body}`;
+    // Store data for the form modal
+    lastSearchData = {
+      precinct_code: p.precinct,
+      leg_dist:      p.leg_dist,
+    };
 
     show("cta-box");
     hide("full-box");
@@ -222,35 +245,113 @@ function showResults(feature, matchedAddress, lat, lon) {
 
   show("result-box");
 
-  // ----- Map updates -----
-
-  // User location marker
   if (userMarker) map.removeLayer(userMarker);
   userMarker = L.circleMarker([lat, lon], {
-    radius: 9,
-    fillColor: "#fff",
-    color: "#003087",
-    weight: 3,
-    fillOpacity: 1,
+    radius: 9, fillColor: "#fff", color: "#003087", weight: 3, fillOpacity: 1,
   })
     .addTo(map)
     .bindPopup(`<strong>Your address</strong><br>${matchedAddress}`)
     .openPopup();
 
-  // Highlight found precinct
   if (highlightLayer) map.removeLayer(highlightLayer);
   highlightLayer = L.geoJSON(feature, {
     style: {
       fillColor: leaderColor(count),
-      weight: 3,
-      color: "#003087",
-      fillOpacity: 0.65,
-      dashArray: "6 4",
+      weight: 3, color: "#003087", fillOpacity: 0.65, dashArray: "6 4",
     },
   }).addTo(map);
 
-  // Zoom to fit the precinct
   map.fitBounds(highlightLayer.getBounds(), { padding: [50, 50], maxZoom: 15 });
+}
+
+// ---------------------------------------------------------------------------
+// Interest form modal
+// ---------------------------------------------------------------------------
+
+function wireModal() {
+  document.getElementById("cta-open-form").addEventListener("click", openModal);
+  document.getElementById("modal-close-btn").addEventListener("click", closeModal);
+  document.getElementById("modal-cancel-btn").addEventListener("click", closeModal);
+  document.getElementById("interest-modal").addEventListener("click", (e) => {
+    if (e.target === e.currentTarget) closeModal();
+  });
+  document.getElementById("interest-form").addEventListener("submit", handleFormSubmit);
+}
+
+function openModal() {
+  const data = lastSearchData || {};
+  document.getElementById("form-precinct").value  = data.precinct_code || "";
+  document.getElementById("form-leg-dist").value  = data.leg_dist      || "";
+  document.getElementById("modal-precinct-label").textContent = data.precinct_code || "";
+  document.getElementById("modal-ld-label").textContent       = data.leg_dist      || "";
+
+  // Reset form state
+  document.getElementById("interest-form").reset();
+  document.getElementById("form-precinct").value = data.precinct_code || "";
+  document.getElementById("form-leg-dist").value = data.leg_dist      || "";
+  hide("modal-success");
+  hide("modal-error");
+  document.getElementById("interest-form").classList.remove("hidden");
+  document.getElementById("form-submit-btn").disabled = false;
+
+  show("interest-modal");
+  document.getElementById("form-first-name").focus();
+}
+
+function closeModal() {
+  hide("interest-modal");
+}
+
+async function handleFormSubmit(e) {
+  e.preventDefault();
+  hide("modal-error");
+
+  const first_name    = document.getElementById("form-first-name").value.trim();
+  const last_name     = document.getElementById("form-last-name").value.trim();
+  const email         = document.getElementById("form-email").value.trim();
+  const phone         = document.getElementById("form-phone").value.trim();
+  const message       = document.getElementById("form-message").value.trim();
+  const precinct_code = document.getElementById("form-precinct").value;
+  const leg_dist      = document.getElementById("form-leg-dist").value;
+
+  if (!first_name || !last_name || !email) {
+    showModalError("Please fill in all required fields.");
+    return;
+  }
+
+  const submitBtn = document.getElementById("form-submit-btn");
+  submitBtn.disabled = true;
+  submitBtn.textContent = "Submitting…";
+
+  try {
+    const resp = await fetch("/api/submit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ first_name, last_name, email, phone, message, precinct_code, leg_dist }),
+    });
+    const data = await resp.json();
+
+    if (!resp.ok) {
+      showModalError(data.error || "Submission failed. Please try again.");
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Submit";
+      return;
+    }
+
+    // Success
+    document.getElementById("interest-form").classList.add("hidden");
+    show("modal-success");
+  } catch (_) {
+    showModalError("An unexpected error occurred. Please try again.");
+    submitBtn.disabled = false;
+    submitBtn.textContent = "Submit";
+  }
+}
+
+function showModalError(msg) {
+  const el = document.getElementById("modal-error");
+  el.textContent = msg;
+  show("modal-error");
 }
 
 // ---------------------------------------------------------------------------
@@ -268,18 +369,16 @@ function clearResults() {
   hide("full-box");
 }
 
-function clearError() {
-  hide("error-box");
-}
+function clearError() { hide("error-box"); }
 
 function showError(msg) {
   document.getElementById("error-msg").textContent = msg;
   show("error-box");
 }
 
-function show(id) { document.getElementById(id).classList.remove("hidden"); }
-function hide(id) { document.getElementById(id).classList.add("hidden"); }
-function toggle(id, on) { on ? show(id) : hide(id); }
+function show(id)          { document.getElementById(id).classList.remove("hidden"); }
+function hide(id)          { document.getElementById(id).classList.add("hidden"); }
+function toggle(id, on)    { on ? show(id) : hide(id); }
 
 // ---------------------------------------------------------------------------
 // Boot

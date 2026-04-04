@@ -1,3 +1,7 @@
 flask>=3.0
 requests>=2.31
 gunicorn>=21.0
+psycopg2-binary>=2.9
+google-auth>=2.20
+google-auth-httplib2>=0.1
+google-api-python-client>=2.90
