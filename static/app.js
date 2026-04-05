@@ -97,19 +97,20 @@ function renderPrecincts() {
       const status =
         p.unique_leaders >= leaderThreshold ? "Fully staffed" :
         p.unique_leaders > 0 ? "Needs more leaders" : "No leaders";
-      layer.bindPopup(
-        `<strong>Precinct ${p.precinct}</strong><br>` +
+      layer.bindTooltip(
+        `<strong>Precinct ${p.precinct}</strong> &nbsp;|&nbsp; ` +
         `LD ${p.leg_dist} &nbsp;|&nbsp; ` +
-        `<strong>${p.unique_leaders}</strong> leader(s)<br>` +
-        `<em>${status}</em>`
+        `<strong>${p.unique_leaders}</strong> leader(s) &mdash; <em>${status}</em>`,
+        { sticky: true, opacity: 0.92 }
       );
       layer.on("mouseover", function () {
         this.setStyle({ weight: 2, fillOpacity: 0.75 });
-        this.openPopup();
       });
       layer.on("mouseout", function () {
         precinctLayer.resetStyle(this);
-        this.closePopup();
+      });
+      layer.on("click", function () {
+        showPrecinctFromMap(feature);
       });
     },
   }).addTo(map);
@@ -208,42 +209,28 @@ async function doSearch() {
 // Results display
 // ---------------------------------------------------------------------------
 
+// Called when the user clicks a precinct on the map directly.
+function showPrecinctFromMap(feature) {
+  clearResults();
+  clearError();
+  _renderResultPanel(feature, null, null, null);
+
+  // Highlight the clicked precinct
+  if (highlightLayer) map.removeLayer(highlightLayer);
+  highlightLayer = L.geoJSON(feature, {
+    style: {
+      fillColor: leaderColor(feature.properties.unique_leaders),
+      weight: 3, color: "#003087", fillOpacity: 0.65, dashArray: "6 4",
+    },
+  }).addTo(map);
+
+  // Scroll the panel into view on mobile
+  document.getElementById("panel").scrollTop = 0;
+}
+
+// Called after a successful address search.
 function showResults(feature, matchedAddress, lat, lon) {
-  const p     = feature.properties;
-  const count = p.unique_leaders;
-  const isFull = count >= leaderThreshold;
-
-  document.getElementById("matched-addr").textContent = matchedAddress;
-  document.getElementById("r-precinct").textContent   = p.precinct;
-  document.getElementById("r-ld").textContent         = p.leg_dist;
-  document.getElementById("r-count").textContent      = count;
-
-  const badge      = document.getElementById("r-status-badge");
-  const badgeLabel = document.getElementById("r-badge-label");
-  badge.className  = "precinct-card-right " +
-    (isFull ? "status-full" : count > 0 ? "status-needs" : "status-empty");
-  badgeLabel.textContent = isFull ? "Fully Staffed" : "Needs Leaders";
-
-  if (isFull) {
-    document.getElementById("full-precinct").textContent = p.precinct;
-    document.getElementById("full-count").textContent    = count;
-    show("full-box");
-    hide("cta-box");
-  } else {
-    document.getElementById("cta-precinct").textContent = p.precinct;
-    document.getElementById("cta-count").textContent    = count;
-
-    // Store data for the form modal
-    lastSearchData = {
-      precinct_code: p.precinct,
-      leg_dist:      p.leg_dist,
-    };
-
-    show("cta-box");
-    hide("full-box");
-  }
-
-  show("result-box");
+  _renderResultPanel(feature, matchedAddress, lat, lon);
 
   if (userMarker) map.removeLayer(userMarker);
   userMarker = L.circleMarker([lat, lon], {
@@ -256,12 +243,55 @@ function showResults(feature, matchedAddress, lat, lon) {
   if (highlightLayer) map.removeLayer(highlightLayer);
   highlightLayer = L.geoJSON(feature, {
     style: {
-      fillColor: leaderColor(count),
+      fillColor: leaderColor(feature.properties.unique_leaders),
       weight: 3, color: "#003087", fillOpacity: 0.65, dashArray: "6 4",
     },
   }).addTo(map);
 
   map.fitBounds(highlightLayer.getBounds(), { padding: [50, 50], maxZoom: 15 });
+}
+
+// Shared panel rendering for both address search and map click.
+// matchedAddress / lat / lon are null when triggered by a map click.
+function _renderResultPanel(feature, matchedAddress, lat, lon) {
+  const p      = feature.properties;
+  const count  = p.unique_leaders;
+  const isFull = count >= leaderThreshold;
+
+  const matchedRow = document.getElementById("matched-addr-row");
+  if (matchedAddress) {
+    document.getElementById("matched-addr").textContent = matchedAddress;
+    matchedRow.classList.remove("hidden");
+  } else {
+    matchedRow.classList.add("hidden");
+  }
+
+  document.getElementById("r-precinct").textContent = p.precinct;
+  document.getElementById("r-ld").textContent        = p.leg_dist;
+  document.getElementById("r-count").textContent     = count;
+
+  const badge      = document.getElementById("r-status-badge");
+  const badgeLabel = document.getElementById("r-badge-label");
+  badge.className  = "precinct-card-right " +
+    (isFull ? "status-full" : count > 0 ? "status-needs" : "status-empty");
+  badgeLabel.textContent = isFull ? "Fully Staffed" : "Needs Leaders";
+
+  // Store for form pre-fill regardless of status
+  lastSearchData = { precinct_code: p.precinct, leg_dist: p.leg_dist };
+
+  if (isFull) {
+    document.getElementById("full-precinct").textContent = p.precinct;
+    document.getElementById("full-count").textContent    = count;
+    show("full-box");
+    hide("cta-box");
+  } else {
+    document.getElementById("cta-precinct").textContent = p.precinct;
+    document.getElementById("cta-count").textContent    = count;
+    show("cta-box");
+    hide("full-box");
+  }
+
+  show("result-box");
 }
 
 // ---------------------------------------------------------------------------
@@ -270,6 +300,7 @@ function showResults(feature, matchedAddress, lat, lon) {
 
 function wireModal() {
   document.getElementById("cta-open-form").addEventListener("click", openModal);
+  document.getElementById("full-open-form").addEventListener("click", openModal);
   document.getElementById("modal-close-btn").addEventListener("click", closeModal);
   document.getElementById("modal-cancel-btn").addEventListener("click", closeModal);
   document.getElementById("interest-modal").addEventListener("click", (e) => {

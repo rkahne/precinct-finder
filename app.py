@@ -10,6 +10,10 @@ Environment variables:
 """
 import os
 import logging
+import smtplib
+import threading
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 import requests
 from flask import Flask, jsonify, request, send_from_directory
 import psycopg2
@@ -33,6 +37,18 @@ DATABASE_URL             = os.environ.get("DATABASE_URL", "")
 GOOGLE_CREDENTIALS_FILE  = os.environ.get("GOOGLE_CREDENTIALS_FILE", "")
 GOOGLE_SHEET_ID          = os.environ.get("GOOGLE_SHEET_ID", "")
 LEADER_THRESHOLD         = 3
+
+SMTP_HOST     = os.environ.get("SMTP_HOST", "")
+SMTP_PORT     = int(os.environ.get("SMTP_PORT", "587"))
+SMTP_USER     = os.environ.get("SMTP_USER", "")
+SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
+SMTP_FROM     = os.environ.get("SMTP_FROM", SMTP_USER)
+NOTIFY_EMAILS = [
+    "chair@louisvilledems.com",
+    "vicechair@louisvilledems.com",
+    "communications@louisvilledems.com",
+    "tech@louisvilledems.com",
+]
 
 # ---------------------------------------------------------------------------
 # PostgreSQL connection pool
@@ -100,6 +116,47 @@ def _append_sheet(row):
     except Exception as exc:
         logger.error("Sheets append failed: %s", exc)
         return False
+
+
+def _send_notification_email(submission):
+    """Send a notification email to staff. Runs in a background thread."""
+    if not SMTP_HOST or not SMTP_USER or not SMTP_PASSWORD:
+        logger.info("SMTP not configured — skipping notification email.")
+        return
+
+    def _send():
+        precinct = submission.get("precinct_code") or "Unknown"
+        leg_dist = submission.get("leg_dist") or "Unknown"
+        name     = f"{submission['first_name']} {submission['last_name']}"
+        email    = submission["email"]
+        phone    = submission.get("phone") or "Not provided"
+        message  = submission.get("message") or "None"
+
+        body = f"""A new precinct leader interest form was submitted.
+
+Name:      {name}
+Email:     {email}
+Phone:     {phone}
+Precinct:  {precinct}
+Leg Dist:  {leg_dist}
+Message:   {message}
+"""
+        msg = MIMEMultipart()
+        msg["From"]    = SMTP_FROM
+        msg["To"]      = ", ".join(NOTIFY_EMAILS)
+        msg["Subject"] = f"Precinct Leader Interest — Precinct {precinct}"
+        msg.attach(MIMEText(body, "plain"))
+
+        try:
+            with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+                server.starttls()
+                server.login(SMTP_USER, SMTP_PASSWORD)
+                server.sendmail(SMTP_FROM, NOTIFY_EMAILS, msg.as_string())
+            logger.info("Notification email sent for precinct %s", precinct)
+        except Exception as exc:
+            logger.error("Failed to send notification email: %s", exc)
+
+    threading.Thread(target=_send, daemon=True).start()
 
 
 def _client_ip():
@@ -310,6 +367,17 @@ def submit():
         finally:
             if conn2:
                 _release(conn2)
+
+    # Notify staff (non-blocking)
+    _send_notification_email({
+        "first_name":    first_name,
+        "last_name":     last_name,
+        "email":         email,
+        "phone":         phone,
+        "precinct_code": precinct_code,
+        "leg_dist":      leg_dist,
+        "message":       message,
+    })
 
     return jsonify({"ok": True, "id": submission_id})
 

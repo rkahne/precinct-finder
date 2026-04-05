@@ -311,6 +311,18 @@ main {
   background: var(--blue-dk);
 }
 
+.cta-btn-secondary {
+  background: transparent;
+  color: var(--blue);
+  border: 1.5px solid var(--blue);
+  margin-top: 0.5rem;
+}
+
+.cta-btn-secondary:hover {
+  background: var(--blue);
+  color: #fff;
+}
+
 /* ---- Full-staffed box ---- */
 .full-box {
   background: #ecfdf5;
