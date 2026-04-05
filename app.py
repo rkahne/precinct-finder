@@ -148,10 +148,15 @@ Message:   {message}
         msg.attach(MIMEText(body, "plain"))
 
         try:
-            with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
-                server.starttls()
-                server.login(SMTP_USER, SMTP_PASSWORD)
-                server.sendmail(SMTP_FROM, NOTIFY_EMAILS, msg.as_string())
+            if SMTP_PORT == 465:
+                with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT) as server:
+                    server.login(SMTP_USER, SMTP_PASSWORD)
+                    server.sendmail(SMTP_FROM, NOTIFY_EMAILS, msg.as_string())
+            else:
+                with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+                    server.starttls()
+                    server.login(SMTP_USER, SMTP_PASSWORD)
+                    server.sendmail(SMTP_FROM, NOTIFY_EMAILS, msg.as_string())
             logger.info("Notification email sent for precinct %s", precinct)
         except Exception as exc:
             logger.error("Failed to send notification email: %s", exc)

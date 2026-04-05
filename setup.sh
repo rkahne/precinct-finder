@@ -96,7 +96,7 @@ echo "==> Configuring nginx reverse proxy..."
 cat > "/etc/nginx/sites-available/${SERVICE_NAME}" << 'EOF'
 server {
     listen 80;
-    server_name precinct-leader-interest.louisvilledems.com;
+    server_name precinct-leaders.louisvilledems.com;
 
     proxy_buffer_size 128k;
     proxy_buffers 4 256k;
