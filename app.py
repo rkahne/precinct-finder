@@ -48,6 +48,7 @@ NOTIFY_EMAILS = [
     "vicechair@louisvilledems.com",
     "communications@louisvilledems.com",
     "tech@louisvilledems.com",
+    "jessicarhaggy89@gmail.com",
 ]
 
 # ---------------------------------------------------------------------------
@@ -125,8 +126,11 @@ def _send_notification_email(submission):
         return
 
     def _send():
-        precinct  = submission.get("precinct_code") or "Unknown"
-        leg_dist  = submission.get("leg_dist") or "Unknown"
+        precinct    = submission.get("precinct_code") or "Unknown"
+        leg_dist    = submission.get("leg_dist") or "Unknown"
+        is_volunteer = submission.get("light_form", False)
+        role_label  = "General Volunteer" if is_volunteer else "Precinct Leader Slot"
+
         legal_name = (
             f"{submission.get('legal_first_name', '')} "
             f"{submission.get('legal_middle_name') or ''} "
@@ -140,12 +144,25 @@ def _send_notification_email(submission):
             f"{submission.get('city', '')}, "
             f"{submission.get('state', '')} "
             f"{submission.get('zip_code', '')}"
-        )
-        birthdate    = submission.get("birthdate") or "Not provided"
-        is_democrat  = "Yes" if submission.get("is_democrat") else "No"
+        ).strip(", ")
+        birthdate   = submission.get("birthdate") or "Not provided"
+        is_democrat = "Yes" if submission.get("is_democrat") else "No"
 
-        body = f"""A new precinct leader interest form was submitted.
+        if is_volunteer:
+            body = f"""A new volunteer interest form was submitted.
 
+Submission Type: {role_label}
+Name:            {preferred} {submission.get('legal_last_name', '')}
+Email:           {email}
+Phone:           {phone}
+Address:         {submission.get('street_address', '') or 'Not provided'}
+Precinct:        {precinct}
+Leg Dist:        {leg_dist}
+"""
+        else:
+            body = f"""A new precinct leader interest form was submitted.
+
+Submission Type: {role_label}
 Legal Name:      {legal_name}
 Preferred Name:  {preferred}
 Email:           {email}
@@ -159,7 +176,7 @@ Leg Dist:        {leg_dist}
         msg = MIMEMultipart()
         msg["From"]    = SMTP_FROM
         msg["To"]      = ", ".join(NOTIFY_EMAILS)
-        msg["Subject"] = f"Precinct Leader Interest — Precinct {precinct}"
+        msg["Subject"] = f"{role_label} Interest — Precinct {precinct}"
         msg.attach(MIMEText(body, "plain"))
 
         try:
@@ -402,9 +419,11 @@ def submit():
             _release(conn)
 
     # Export to Google Sheets (best-effort)
+    submission_type = "General Volunteer" if light_form else "Precinct Leader Slot"
     exported = _append_sheet([
         submission_id,
         submitted_at.isoformat() if submitted_at else "",
+        submission_type,
         legal_first_name,
         preferred_first_name or "",
         legal_middle_name or "",
@@ -453,6 +472,7 @@ def submit():
         "is_democrat":          is_democrat,
         "precinct_code":        precinct_code,
         "leg_dist":             leg_dist,
+        "light_form":           light_form,
     })
 
     return jsonify({"ok": True, "id": submission_id})
