@@ -277,7 +277,11 @@ function _renderResultPanel(feature, matchedAddress, lat, lon) {
   badgeLabel.textContent = isFull ? "Fully Staffed" : "Needs Leaders";
 
   // Store for form pre-fill regardless of status
-  lastSearchData = { precinct_code: p.precinct, leg_dist: p.leg_dist };
+  lastSearchData = {
+    precinct_code:   p.precinct,
+    leg_dist:        p.leg_dist,
+    matched_address: matchedAddress || null,
+  };
 
   if (isFull) {
     document.getElementById("full-precinct").textContent = p.precinct;
@@ -320,9 +324,19 @@ function openModal() {
   document.getElementById("form-leg-dist").value         = data.leg_dist      || "";
   document.getElementById("form-precinct-display").value = data.precinct_code || "";
 
-  // Default city/state
-  document.getElementById("form-city").value  = "Louisville";
-  document.getElementById("form-state").value = "KY";
+  // Parse matched address → "123 MAIN ST, LOUISVILLE, KY, 40205"
+  const parts        = (data.matched_address || "").split(",").map((s) => s.trim());
+  const streetPart   = parts[0] || "";
+  const cityPart     = parts[1] || "Louisville";
+  // parts[2] is "KY 40205" or just "KY"; split on space to separate state and zip
+  const stateZip     = (parts[2] || "KY").trim().split(/\s+/);
+  const statePart    = stateZip[0] || "KY";
+  const zipPart      = stateZip[1] || (parts[3] || "");
+
+  document.getElementById("form-street-address").value = streetPart;
+  document.getElementById("form-city").value           = cityPart;
+  document.getElementById("form-state").value          = statePart;
+  document.getElementById("form-zip").value            = zipPart;
 
   hide("modal-success");
   hide("modal-error");
@@ -332,6 +346,18 @@ function openModal() {
 
   show("interest-modal");
   document.getElementById("form-legal-first-name").focus();
+
+  // Show scroll hint, hide once user scrolls near bottom
+  const box  = document.querySelector(".modal-box");
+  const hint = document.getElementById("modal-scroll-hint");
+  hint.style.opacity = "1";
+  const onScroll = () => {
+    const nearBottom = box.scrollTop + box.clientHeight >= box.scrollHeight - 40;
+    hint.style.opacity = nearBottom ? "0" : "1";
+  };
+  box.scrollTop = 0;
+  box.removeEventListener("scroll", onScroll); // clear any previous listener
+  box.addEventListener("scroll", onScroll);
 }
 
 function closeModal() {
