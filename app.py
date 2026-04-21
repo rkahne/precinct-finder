@@ -435,7 +435,7 @@ def submit():
         email,
         phone or "",
         birthdate or "",
-        "Yes" if is_democrat else "No",
+        ("Yes" if is_democrat else "No") if not light_form else "",
         precinct_code or "",
         leg_dist or "",
         str(ip or ""),
