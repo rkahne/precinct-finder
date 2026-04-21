@@ -351,10 +351,16 @@ def submit():
     leg_dist             = (data.get("leg_dist")             or "").strip()[:20]  or None
     is_democrat          = data.get("is_democrat")  # bool or None
 
-    if not legal_first_name or not legal_last_name or not email or not phone \
-            or not street_address or not city or not state or not zip_code \
-            or not birthdate or is_democrat is None:
-        return jsonify({"error": "Please fill in all required fields."}), 400
+    light_form = bool(data.get("light_form"))
+
+    if light_form:
+        if not legal_last_name or not email or not phone:
+            return jsonify({"error": "Please fill in all required fields."}), 400
+    else:
+        if not legal_first_name or not legal_last_name or not email or not phone \
+                or not street_address or not city or not state or not zip_code \
+                or not birthdate or is_democrat is None:
+            return jsonify({"error": "Please fill in all required fields."}), 400
 
     if "@" not in email or "." not in email.split("@")[-1]:
         return jsonify({"error": "Please enter a valid email address."}), 400

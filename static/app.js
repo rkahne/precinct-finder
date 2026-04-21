@@ -303,14 +303,23 @@ function _renderResultPanel(feature, matchedAddress, lat, lon) {
 // ---------------------------------------------------------------------------
 
 function wireModal() {
+  // Full form (needs-leaders CTA)
   document.getElementById("cta-open-form").addEventListener("click", openModal);
-  document.getElementById("full-open-form").addEventListener("click", openModal);
   document.getElementById("modal-close-btn").addEventListener("click", closeModal);
   document.getElementById("modal-cancel-btn").addEventListener("click", closeModal);
   document.getElementById("interest-modal").addEventListener("click", (e) => {
     if (e.target === e.currentTarget) closeModal();
   });
   document.getElementById("interest-form").addEventListener("submit", handleFormSubmit);
+
+  // Light form (fully-staffed CTA)
+  document.getElementById("full-open-form").addEventListener("click", openLightModal);
+  document.getElementById("light-modal-close-btn").addEventListener("click", closeLightModal);
+  document.getElementById("light-modal-cancel-btn").addEventListener("click", closeLightModal);
+  document.getElementById("light-modal").addEventListener("click", (e) => {
+    if (e.target === e.currentTarget) closeLightModal();
+  });
+  document.getElementById("light-interest-form").addEventListener("submit", handleLightFormSubmit);
 }
 
 function openModal() {
@@ -427,6 +436,97 @@ function showModalError(msg) {
   const el = document.getElementById("modal-error");
   el.textContent = msg;
   show("modal-error");
+}
+
+// ---------------------------------------------------------------------------
+// Light interest modal (fully-staffed precincts)
+// ---------------------------------------------------------------------------
+
+function openLightModal() {
+  const data = lastSearchData || {};
+
+  document.getElementById("light-interest-form").reset();
+  document.getElementById("light-form-precinct").value         = data.precinct_code || "";
+  document.getElementById("light-form-leg-dist").value         = data.leg_dist      || "";
+  document.getElementById("light-form-precinct-display").value = data.precinct_code || "";
+
+  // Pre-fill street address from matched address
+  const parts = (data.matched_address || "").split(",").map((s) => s.trim());
+  document.getElementById("light-form-address").value = parts[0] || "";
+
+  hide("light-modal-success");
+  hide("light-modal-error");
+  document.getElementById("light-interest-form").classList.remove("hidden");
+  document.getElementById("light-form-submit-btn").disabled    = false;
+  document.getElementById("light-form-submit-btn").textContent = "Submit";
+
+  show("light-modal");
+  document.getElementById("light-form-first-name").focus();
+}
+
+function closeLightModal() {
+  hide("light-modal");
+}
+
+async function handleLightFormSubmit(e) {
+  e.preventDefault();
+  hide("light-modal-error");
+
+  const preferred_first_name = document.getElementById("light-form-first-name").value.trim();
+  const legal_last_name      = document.getElementById("light-form-last-name").value.trim();
+  const email                = document.getElementById("light-form-email").value.trim();
+  const phone                = document.getElementById("light-form-phone").value.trim();
+  const street_address       = document.getElementById("light-form-address").value.trim();
+  const precinct_code        = document.getElementById("light-form-precinct").value;
+  const leg_dist             = document.getElementById("light-form-leg-dist").value;
+
+  if (!preferred_first_name || !legal_last_name || !email || !phone) {
+    _showLightModalError("Please fill in all required fields.");
+    return;
+  }
+
+  const submitBtn = document.getElementById("light-form-submit-btn");
+  submitBtn.disabled    = true;
+  submitBtn.textContent = "Submitting…";
+
+  try {
+    const resp = await fetch("/api/submit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        preferred_first_name,
+        legal_last_name,
+        email,
+        phone,
+        street_address: street_address || null,
+        precinct_code,
+        leg_dist,
+        // Mark as fully-staffed interest (no credentialing fields needed)
+        light_form: true,
+      }),
+    });
+    const data = await resp.json();
+
+    if (!resp.ok) {
+      _showLightModalError(data.error || "Submission failed. Please try again.");
+      submitBtn.disabled    = false;
+      submitBtn.textContent = "Submit";
+      return;
+    }
+
+    document.getElementById("light-interest-form").classList.add("hidden");
+    show("light-modal-success");
+  } catch (_) {
+    _showLightModalError("An unexpected error occurred. Please try again.");
+    submitBtn.disabled    = false;
+    submitBtn.textContent = "Submit";
+  }
+}
+
+function _showLightModalError(msg) {
+  const el = document.getElementById("light-modal-error");
+  el.textContent = msg;
+  show("light-modal-error");
 }
 
 // ---------------------------------------------------------------------------
