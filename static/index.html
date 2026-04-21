@@ -112,13 +112,16 @@
   <div id="interest-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title">
     <div class="modal-box">
       <div class="modal-header">
-        <h2 id="modal-title">Express Interest in Becoming a Precinct Leader</h2>
+        <h2 id="modal-title">Become a Precinct Leader in your neighborhood!</h2>
         <button class="modal-close" id="modal-close-btn" aria-label="Close">&times;</button>
       </div>
-      <p class="modal-desc">
-        Fill out the form below and our team will follow up with next steps.
-        Precinct <strong id="modal-precinct-label"></strong> (LD <span id="modal-ld-label"></span>)
-      </p>
+
+      <div class="modal-intro">
+        <p><strong>Welcome to the first step in becoming a leader in the Democratic Party!</strong></p>
+        <p>Precincts are the building blocks for everything that the party does, and precinct leaders help manage these blocks. Think of them as neighborhood advocates. There are over 600 precincts in Louisville, and every precinct has 3 leadership positions for Democrats: Precinct Man, Precinct Woman, and Precinct Youth (Age 40 and under). This is the team that will make sure that the constituents in their neighborhoods are up-to-date on everything that Democrats are doing in the community.</p>
+        <p>Precinct Leaders are led by Legislative District Chairs, who are elected and have seats on the Louisville Democratic Party Executive Committee.</p>
+        <p class="modal-privacy">For credentialing reasons, we need your legal name and birthday. All information received here is kept fully private.</p>
+      </div>
 
       <div id="modal-success" class="modal-success hidden">
         <strong>Thank you!</strong> We've received your information and will be in touch soon.
@@ -126,18 +129,56 @@
       <div id="modal-error" class="modal-form-error hidden"></div>
 
       <form id="interest-form" novalidate>
-        <input type="hidden" id="form-precinct"  name="precinct_code" />
-        <input type="hidden" id="form-leg-dist"  name="leg_dist" />
+        <input type="hidden" id="form-precinct" name="precinct_code" />
+        <input type="hidden" id="form-leg-dist" name="leg_dist" />
+
+        <div class="form-group">
+          <label for="form-legal-first-name">Legal First Name <span class="required">*</span></label>
+          <p class="field-hint">Please give us your name how you are registered to vote.</p>
+          <input type="text" id="form-legal-first-name" name="legal_first_name" required autocomplete="given-name" />
+        </div>
+
+        <div class="form-group">
+          <label for="form-preferred-first-name">Preferred First Name <span class="optional">(optional)</span></label>
+          <input type="text" id="form-preferred-first-name" name="preferred_first_name" />
+        </div>
+
+        <div class="form-group">
+          <label for="form-legal-middle-name">Legal Middle Name <span class="optional">(optional)</span></label>
+          <p class="field-hint">Please give us your name how you are registered to vote.</p>
+          <input type="text" id="form-legal-middle-name" name="legal_middle_name" />
+        </div>
+
+        <div class="form-group">
+          <label for="form-legal-last-name">Legal Last Name <span class="required">*</span></label>
+          <p class="field-hint">Please give us your name how you are registered to vote.</p>
+          <input type="text" id="form-legal-last-name" name="legal_last_name" required autocomplete="family-name" />
+        </div>
+
+        <div class="form-group">
+          <label for="form-precinct-display">Your Precinct <span class="required">*</span></label>
+          <input type="text" id="form-precinct-display" name="precinct_display" required />
+        </div>
+
+        <div class="form-group">
+          <label for="form-street-address">Street Address <span class="required">*</span></label>
+          <input type="text" id="form-street-address" name="street_address" required autocomplete="street-address" />
+        </div>
 
         <div class="form-row">
           <div class="form-group">
-            <label for="form-first-name">First Name <span class="required">*</span></label>
-            <input type="text" id="form-first-name" name="first_name" required autocomplete="given-name" />
+            <label for="form-city">City <span class="required">*</span></label>
+            <input type="text" id="form-city" name="city" required autocomplete="address-level2" value="Louisville" />
           </div>
           <div class="form-group">
-            <label for="form-last-name">Last Name <span class="required">*</span></label>
-            <input type="text" id="form-last-name" name="last_name" required autocomplete="family-name" />
+            <label for="form-state">State <span class="required">*</span></label>
+            <input type="text" id="form-state" name="state" required autocomplete="address-level1" value="KY" />
           </div>
+        </div>
+
+        <div class="form-group">
+          <label for="form-zip">Zip Code <span class="required">*</span></label>
+          <input type="text" id="form-zip" name="zip_code" required autocomplete="postal-code" inputmode="numeric" />
         </div>
 
         <div class="form-group">
@@ -146,14 +187,26 @@
         </div>
 
         <div class="form-group">
-          <label for="form-phone">Phone <span class="optional">(optional)</span></label>
-          <input type="tel" id="form-phone" name="phone" autocomplete="tel" />
+          <label for="form-phone">Mobile Phone Number <span class="required">*</span></label>
+          <input type="tel" id="form-phone" name="phone" required autocomplete="tel" />
         </div>
 
         <div class="form-group">
-          <label for="form-message">Message <span class="optional">(optional)</span></label>
-          <textarea id="form-message" name="message" rows="3"
-            placeholder="Best time to reach you, questions, etc."></textarea>
+          <label for="form-birthdate">Birthdate <span class="required">*</span></label>
+          <p class="field-hint">We need this information for credentialing you for your precinct.</p>
+          <input type="date" id="form-birthdate" name="birthdate" required />
+        </div>
+
+        <div class="form-group">
+          <label>Are you a registered Democrat? <span class="required">*</span></label>
+          <div class="radio-group">
+            <label class="radio-label">
+              <input type="radio" name="is_democrat" value="yes" required /> Yes
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="is_democrat" value="no" /> No
+            </label>
+          </div>
         </div>
 
         <div class="form-actions">

@@ -311,22 +311,27 @@ function wireModal() {
 
 function openModal() {
   const data = lastSearchData || {};
-  document.getElementById("form-precinct").value  = data.precinct_code || "";
-  document.getElementById("form-leg-dist").value  = data.leg_dist      || "";
-  document.getElementById("modal-precinct-label").textContent = data.precinct_code || "";
-  document.getElementById("modal-ld-label").textContent       = data.leg_dist      || "";
 
-  // Reset form state
+  // Reset form state first
   document.getElementById("interest-form").reset();
-  document.getElementById("form-precinct").value = data.precinct_code || "";
-  document.getElementById("form-leg-dist").value = data.leg_dist      || "";
+
+  // Pre-fill hidden fields and precinct display
+  document.getElementById("form-precinct").value         = data.precinct_code || "";
+  document.getElementById("form-leg-dist").value         = data.leg_dist      || "";
+  document.getElementById("form-precinct-display").value = data.precinct_code || "";
+
+  // Default city/state
+  document.getElementById("form-city").value  = "Louisville";
+  document.getElementById("form-state").value = "KY";
+
   hide("modal-success");
   hide("modal-error");
   document.getElementById("interest-form").classList.remove("hidden");
-  document.getElementById("form-submit-btn").disabled = false;
+  document.getElementById("form-submit-btn").disabled    = false;
+  document.getElementById("form-submit-btn").textContent = "Submit";
 
   show("interest-modal");
-  document.getElementById("form-first-name").focus();
+  document.getElementById("form-legal-first-name").focus();
 }
 
 function closeModal() {
@@ -337,44 +342,57 @@ async function handleFormSubmit(e) {
   e.preventDefault();
   hide("modal-error");
 
-  const first_name    = document.getElementById("form-first-name").value.trim();
-  const last_name     = document.getElementById("form-last-name").value.trim();
-  const email         = document.getElementById("form-email").value.trim();
-  const phone         = document.getElementById("form-phone").value.trim();
-  const message       = document.getElementById("form-message").value.trim();
-  const precinct_code = document.getElementById("form-precinct").value;
-  const leg_dist      = document.getElementById("form-leg-dist").value;
+  const legal_first_name     = document.getElementById("form-legal-first-name").value.trim();
+  const preferred_first_name = document.getElementById("form-preferred-first-name").value.trim();
+  const legal_middle_name    = document.getElementById("form-legal-middle-name").value.trim();
+  const legal_last_name      = document.getElementById("form-legal-last-name").value.trim();
+  const street_address       = document.getElementById("form-street-address").value.trim();
+  const city                 = document.getElementById("form-city").value.trim();
+  const state                = document.getElementById("form-state").value.trim();
+  const zip_code             = document.getElementById("form-zip").value.trim();
+  const email                = document.getElementById("form-email").value.trim();
+  const phone                = document.getElementById("form-phone").value.trim();
+  const birthdate            = document.getElementById("form-birthdate").value;
+  const precinct_code        = document.getElementById("form-precinct").value;
+  const leg_dist             = document.getElementById("form-leg-dist").value;
+  const democratEl           = document.querySelector('input[name="is_democrat"]:checked');
+  const is_democrat          = democratEl ? democratEl.value === "yes" : null;
 
-  if (!first_name || !last_name || !email) {
+  if (!legal_first_name || !legal_last_name || !email || !phone ||
+      !street_address || !city || !state || !zip_code || !birthdate || is_democrat === null) {
     showModalError("Please fill in all required fields.");
     return;
   }
 
   const submitBtn = document.getElementById("form-submit-btn");
-  submitBtn.disabled = true;
+  submitBtn.disabled    = true;
   submitBtn.textContent = "Submitting…";
 
   try {
     const resp = await fetch("/api/submit", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ first_name, last_name, email, phone, message, precinct_code, leg_dist }),
+      body: JSON.stringify({
+        legal_first_name, preferred_first_name, legal_middle_name, legal_last_name,
+        street_address, city, state, zip_code,
+        email, phone, birthdate, is_democrat,
+        precinct_code, leg_dist,
+      }),
     });
     const data = await resp.json();
 
     if (!resp.ok) {
       showModalError(data.error || "Submission failed. Please try again.");
-      submitBtn.disabled = false;
+      submitBtn.disabled    = false;
       submitBtn.textContent = "Submit";
       return;
     }
 
-    // Success
     document.getElementById("interest-form").classList.add("hidden");
     show("modal-success");
   } catch (_) {
     showModalError("An unexpected error occurred. Please try again.");
-    submitBtn.disabled = false;
+    submitBtn.disabled    = false;
     submitBtn.textContent = "Submit";
   }
 }

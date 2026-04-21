@@ -125,21 +125,36 @@ def _send_notification_email(submission):
         return
 
     def _send():
-        precinct = submission.get("precinct_code") or "Unknown"
-        leg_dist = submission.get("leg_dist") or "Unknown"
-        name     = f"{submission['first_name']} {submission['last_name']}"
-        email    = submission["email"]
-        phone    = submission.get("phone") or "Not provided"
-        message  = submission.get("message") or "None"
+        precinct  = submission.get("precinct_code") or "Unknown"
+        leg_dist  = submission.get("leg_dist") or "Unknown"
+        legal_name = (
+            f"{submission.get('legal_first_name', '')} "
+            f"{submission.get('legal_middle_name') or ''} "
+            f"{submission.get('legal_last_name', '')}".strip()
+        )
+        preferred = submission.get("preferred_first_name") or "—"
+        email     = submission.get("email", "")
+        phone     = submission.get("phone") or "Not provided"
+        address   = (
+            f"{submission.get('street_address', '')}, "
+            f"{submission.get('city', '')}, "
+            f"{submission.get('state', '')} "
+            f"{submission.get('zip_code', '')}"
+        )
+        birthdate    = submission.get("birthdate") or "Not provided"
+        is_democrat  = "Yes" if submission.get("is_democrat") else "No"
 
         body = f"""A new precinct leader interest form was submitted.
 
-Name:      {name}
-Email:     {email}
-Phone:     {phone}
-Precinct:  {precinct}
-Leg Dist:  {leg_dist}
-Message:   {message}
+Legal Name:      {legal_name}
+Preferred Name:  {preferred}
+Email:           {email}
+Phone:           {phone}
+Address:         {address}
+Birthdate:       {birthdate}
+Democrat:        {is_democrat}
+Precinct:        {precinct}
+Leg Dist:        {leg_dist}
 """
         msg = MIMEMultipart()
         msg["From"]    = SMTP_FROM
@@ -297,22 +312,31 @@ def track_search():
 def submit():
     data = request.get_json(silent=True) or {}
 
-    first_name = (data.get("first_name") or "").strip()[:100]
-    last_name  = (data.get("last_name")  or "").strip()[:100]
-    email      = (data.get("email")      or "").strip()[:200]
+    legal_first_name     = (data.get("legal_first_name")     or "").strip()[:100]
+    legal_last_name      = (data.get("legal_last_name")      or "").strip()[:100]
+    email                = (data.get("email")                or "").strip()[:200]
+    phone                = (data.get("phone")                or "").strip()[:50]
+    street_address       = (data.get("street_address")       or "").strip()[:200]
+    city                 = (data.get("city")                 or "").strip()[:100]
+    state                = (data.get("state")                or "").strip()[:50]
+    zip_code             = (data.get("zip_code")             or "").strip()[:20]
+    birthdate            = (data.get("birthdate")            or "").strip()[:20] or None
+    preferred_first_name = (data.get("preferred_first_name") or "").strip()[:100] or None
+    legal_middle_name    = (data.get("legal_middle_name")    or "").strip()[:100] or None
+    precinct_code        = (data.get("precinct_code")        or "").strip()[:20]  or None
+    leg_dist             = (data.get("leg_dist")             or "").strip()[:20]  or None
+    is_democrat          = data.get("is_democrat")  # bool or None
 
-    if not first_name or not last_name or not email:
-        return jsonify({"error": "First name, last name, and email are required."}), 400
+    if not legal_first_name or not legal_last_name or not email or not phone \
+            or not street_address or not city or not state or not zip_code \
+            or not birthdate or is_democrat is None:
+        return jsonify({"error": "Please fill in all required fields."}), 400
 
     if "@" not in email or "." not in email.split("@")[-1]:
         return jsonify({"error": "Please enter a valid email address."}), 400
 
-    phone         = (data.get("phone")         or "").strip()[:50]  or None
-    precinct_code = (data.get("precinct_code") or "").strip()[:20]  or None
-    leg_dist      = (data.get("leg_dist")      or "").strip()[:20]  or None
-    message       = (data.get("message")       or "").strip()[:2000] or None
-    ip            = _client_ip()
-    ua            = (request.headers.get("User-Agent", "") or "")[:500]
+    ip = _client_ip()
+    ua = (request.headers.get("User-Agent", "") or "")[:500]
 
     conn          = None
     submission_id = None
@@ -323,14 +347,18 @@ def submit():
         with conn.cursor() as cur:
             cur.execute(
                 """INSERT INTO submissions
-                   (first_name, last_name, email, phone, precinct_code, leg_dist,
-                    message, ip_address, user_agent)
-                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                   (legal_first_name, preferred_first_name, legal_middle_name, legal_last_name,
+                    street_address, city, state, zip_code,
+                    email, phone, birthdate, is_democrat,
+                    precinct_code, leg_dist, ip_address, user_agent)
+                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                    RETURNING id, submitted_at""",
-                (first_name, last_name, email, phone,
-                 precinct_code, leg_dist, message, ip, ua or None),
+                (legal_first_name, preferred_first_name, legal_middle_name, legal_last_name,
+                 street_address, city, state, zip_code,
+                 email, phone or None, birthdate, is_democrat,
+                 precinct_code, leg_dist, ip, ua or None),
             )
-            row          = cur.fetchone()
+            row           = cur.fetchone()
             submission_id = row[0]
             submitted_at  = row[1]
         conn.commit()
@@ -343,17 +371,24 @@ def submit():
         if conn:
             _release(conn)
 
-    # Export to Google Sheets (best-effort, non-blocking)
+    # Export to Google Sheets (best-effort)
     exported = _append_sheet([
         submission_id,
         submitted_at.isoformat() if submitted_at else "",
-        first_name,
-        last_name,
+        legal_first_name,
+        preferred_first_name or "",
+        legal_middle_name or "",
+        legal_last_name,
+        street_address,
+        city,
+        state,
+        zip_code,
         email,
         phone or "",
+        birthdate or "",
+        "Yes" if is_democrat else "No",
         precinct_code or "",
         leg_dist or "",
-        message or "",
         str(ip or ""),
     ])
 
@@ -375,13 +410,19 @@ def submit():
 
     # Notify staff (non-blocking)
     _send_notification_email({
-        "first_name":    first_name,
-        "last_name":     last_name,
-        "email":         email,
-        "phone":         phone,
-        "precinct_code": precinct_code,
-        "leg_dist":      leg_dist,
-        "message":       message,
+        "legal_first_name":     legal_first_name,
+        "preferred_first_name": preferred_first_name,
+        "legal_last_name":      legal_last_name,
+        "email":                email,
+        "phone":                phone,
+        "street_address":       street_address,
+        "city":                 city,
+        "state":                state,
+        "zip_code":             zip_code,
+        "birthdate":            birthdate,
+        "is_democrat":          is_democrat,
+        "precinct_code":        precinct_code,
+        "leg_dist":             leg_dist,
     })
 
     return jsonify({"ok": True, "id": submission_id})
