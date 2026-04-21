@@ -224,6 +224,42 @@ def _log_visit():
 # API: geocode an address via US Census Geocoder
 # ---------------------------------------------------------------------------
 
+def _geocode_census(query):
+    """Try US Census geocoder. Returns (lat, lon, matched_address) or None."""
+    try:
+        resp = requests.get(
+            "https://geocoding.geo.census.gov/geocoder/locations/onelineaddress",
+            params={"address": query, "benchmark": "Public_AR_Current", "format": "json"},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        matches = resp.json().get("result", {}).get("addressMatches", [])
+        if matches:
+            m = matches[0]
+            return float(m["coordinates"]["y"]), float(m["coordinates"]["x"]), m["matchedAddress"]
+    except Exception as exc:
+        logger.warning("Census geocoder failed: %s", exc)
+    return None
+
+
+def _geocode_arcgis(query):
+    """Fallback to ArcGIS World Geocoder. Returns (lat, lon, matched_address) or None."""
+    try:
+        resp = requests.get(
+            "https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates",
+            params={"SingleLine": query, "maxLocations": 1, "outFields": "Match_addr", "f": "json"},
+            timeout=15,
+        )
+        resp.raise_for_status()
+        candidates = resp.json().get("candidates", [])
+        if candidates and candidates[0].get("score", 0) >= 80:
+            c = candidates[0]
+            return float(c["location"]["y"]), float(c["location"]["x"]), c["attributes"].get("Match_addr", query)
+    except Exception as exc:
+        logger.warning("ArcGIS geocoder failed: %s", exc)
+    return None
+
+
 @app.route("/api/geocode")
 def geocode():
     address = request.args.get("address", "").strip()
@@ -234,21 +270,9 @@ def geocode():
     if "KY" not in address.upper() and "KENTUCKY" not in address.upper():
         query = f"{address}, Louisville, KY"
 
-    try:
-        resp = requests.get(
-            "https://geocoding.geo.census.gov/geocoder/locations/onelineaddress",
-            params={"address": query, "benchmark": "Public_AR_Current", "format": "json"},
-            timeout=10,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-    except requests.Timeout:
-        return jsonify({"error": "Geocoding service timed out. Please try again."}), 503
-    except Exception as exc:
-        return jsonify({"error": f"Geocoding request failed: {exc}"}), 500
+    result = _geocode_census(query) or _geocode_arcgis(query)
 
-    matches = data.get("result", {}).get("addressMatches", [])
-    if not matches:
+    if not result:
         return jsonify({
             "error": (
                 'Address not found. Try including the city — '
@@ -256,11 +280,11 @@ def geocode():
             )
         }), 404
 
-    m = matches[0]
+    lat, lon, matched_address = result
     return jsonify({
-        "lat":             float(m["coordinates"]["y"]),
-        "lon":             float(m["coordinates"]["x"]),
-        "matched_address": m["matchedAddress"],
+        "lat":             lat,
+        "lon":             lon,
+        "matched_address": matched_address,
         "address_input":   address,
     })
 
