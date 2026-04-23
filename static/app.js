@@ -412,6 +412,7 @@ async function handleFormSubmit(e) {
         street_address, city, state, zip_code,
         email, phone, birthdate, is_democrat,
         precinct_code, leg_dist,
+        website: document.getElementById("form-website").value,
       }),
     });
     const data = await resp.json();
@@ -501,8 +502,8 @@ async function handleLightFormSubmit(e) {
         street_address: street_address || null,
         precinct_code,
         leg_dist,
-        // Mark as fully-staffed interest (no credentialing fields needed)
         light_form: true,
+        website: document.getElementById("light-form-website").value,
       }),
     });
     const data = await resp.json();

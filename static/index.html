@@ -135,6 +135,11 @@
       <form id="interest-form" novalidate>
         <input type="hidden" id="form-precinct" name="precinct_code" />
         <input type="hidden" id="form-leg-dist" name="leg_dist" />
+        <!-- Honeypot: hidden from humans, bots fill it in -->
+        <div class="hp-field" aria-hidden="true">
+          <label for="form-website">Website</label>
+          <input type="text" id="form-website" name="website" tabindex="-1" autocomplete="off" />
+        </div>
 
         <div class="form-group">
           <label for="form-legal-first-name">Legal First Name <span class="required">*</span></label>
@@ -240,6 +245,11 @@
       <form id="light-interest-form" novalidate>
         <input type="hidden" id="light-form-precinct" name="precinct_code" />
         <input type="hidden" id="light-form-leg-dist" name="leg_dist" />
+        <!-- Honeypot -->
+        <div class="hp-field" aria-hidden="true">
+          <label for="light-form-website">Website</label>
+          <input type="text" id="light-form-website" name="website" tabindex="-1" autocomplete="off" />
+        </div>
 
         <div class="form-row">
           <div class="form-group">

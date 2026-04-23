@@ -635,6 +635,16 @@ main {
   border-color: #bbc8d8;
 }
 
+/* ---- Honeypot (hidden from humans) ---- */
+.hp-field {
+  position: absolute;
+  left: -9999px;
+  top: -9999px;
+  opacity: 0;
+  height: 0;
+  overflow: hidden;
+}
+
 /* ---- Utility ---- */
 .hidden { display: none !important; }
 

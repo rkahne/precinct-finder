@@ -31,6 +31,26 @@ except ImportError:
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# ---------------------------------------------------------------------------
+# Simple in-memory rate limiter (resets on service restart)
+# ---------------------------------------------------------------------------
+import time
+from collections import defaultdict
+
+_submission_times = defaultdict(list)  # ip -> [timestamps]
+RATE_LIMIT_MAX    = 5    # max submissions
+RATE_LIMIT_WINDOW = 3600 # per second window (1 hour)
+
+
+def _is_rate_limited(ip: str) -> bool:
+    now   = time.time()
+    times = [t for t in _submission_times[ip] if now - t < RATE_LIMIT_WINDOW]
+    _submission_times[ip] = times
+    if len(times) >= RATE_LIMIT_MAX:
+        return True
+    _submission_times[ip].append(now)
+    return False
+
 app = Flask(__name__, static_folder="static", static_url_path="")
 
 DATABASE_URL             = os.environ.get("DATABASE_URL", "")
@@ -367,6 +387,16 @@ def submit():
     precinct_code        = (data.get("precinct_code")        or "").strip()[:20]  or None
     leg_dist             = (data.get("leg_dist")             or "").strip()[:20]  or None
     is_democrat          = data.get("is_democrat")  # bool or None
+
+    # Honeypot — bots fill this in, humans never see it
+    if data.get("website"):
+        logger.info("Honeypot triggered from %s", ip)
+        return jsonify({"ok": True}), 200  # silently discard
+
+    # Rate limit
+    if _is_rate_limited(ip or "unknown"):
+        logger.warning("Rate limit hit from %s", ip)
+        return jsonify({"error": "Too many submissions. Please try again later."}), 429
 
     light_form = bool(data.get("light_form"))
 
